@@ -62,8 +62,8 @@ juiz run localization_amcl-x.y.z.juizapp    (kind: app, depends: mobile_sim, htt
 
 ### 地図の与え方
 
-1. **conf のファイル**(既定): コンテナの引数 `map` に map_server の YAML を書く。画像は PNG と PGM を読む(stb_image を同梱。public domain / MIT)。`negate`・`occupied_thresh`・`free_thresh`・`mode: trinary` は map_server と同じ解釈。相対パスは mobile_sim と同じく `AMCL_MAP` > `JUIZ_APP_DIR` > conf のディレクトリ > カレントディレクトリの順に探す。パッケージには mobile_sim の既定の地図の写しを `assets/maps/default.yaml` として入れる。
-2. **プロセスで渡す**: `amcl_set_map(image, info)` に、mobile_sim の `get_map`・`get_map_info` や mapper の `get_map`・`get_map_info` の結果をそのまま渡せる。画面に「mobile_sim の地図を使う」「mapper の地図を使う」ボタンを置く。
+1. **conf のファイル**(既定): コンテナの引数 `map` に map_server の YAML を書く。画像は PNG と PGM を読む(stb_image を同梱。public domain / MIT)。`negate`・`occupied_thresh`・`free_thresh`・`mode: trinary` は map_server と同じ解釈。パスは mobile_sim と同じく、環境変数 `AMCL_MAP` があればそれ、相対パスは `JUIZ_APP_DIR`(juiz run の展開先)、無ければカレントディレクトリから探す。パッケージには mobile_sim の既定の地図の写しを `assets/maps/default.yaml` として入れる。
+2. **プロセスで渡す**: `amcl_set_map(image, resolution, origin, negate, occupied_thresh, free_thresh)` に、mobile_sim や mapper の `get_map`(PNG)と `get_map_info` の項目をそのまま渡せる(HTTP では multipart。C++ の ContainerProcess は dict の引数を受けられないので、項目ごとの引数にした)。画面に「mobile_sim の地図を使う」「mapper の地図を使う」ボタンを置く。
 3. `amcl_load_map(path)` で、mapper の `save_map` が書いたファイルを読み直せる。
 
 ROS では地図をトピック `/map` で受けるが、juiz の画像の型と情報の dict が分かれているので、プロセスにした。
@@ -88,11 +88,11 @@ mapper_gmapping と同じ。
 | プロセス | 入力 | 出力 | 使い方 |
 | --- | --- | --- | --- |
 | `amcl_set_odometry` | `Pose2DStamped` | なし | トピック `odom` を購読 |
-| `amcl_add_scan` | `LaserScan` | フィルタを更新したか | トピック `scan` を購読。更新したら推定姿勢を `amcl_pose` に配信 |
+| `amcl_add_scan` | `LaserScan` | 推定姿勢(`Pose2DStamped`) | トピック `scan` を購読。戻り値をトピック `amcl_pose` に配信(スキャンごと、20 Hz) |
 | `amcl_set_laser_pose` | `PoseStamped` | なし | トピック `lidar_mount` を購読 |
-| `amcl_set_initial_pose` | `Pose2DStamped`(+ 共分散の任意の dict) | なし | トピック `initialpose` を購読。画面のクリックから呼ぶ |
+| `amcl_set_initial_pose` | `Pose2DStamped`、`cov_xx`・`cov_yy`・`cov_aa`(負ならコンテナの引数の値) | なし | トピック `initialpose` を購読。画面のドラッグから呼ぶ |
 | `amcl_global_localization` | なし | なし | 粒子を地図の空きセル全体に撒き直す |
-| `amcl_set_map` | 画像(L8)、info(dict) | なし | mobile_sim や mapper の地図を渡す |
+| `amcl_set_map` | 画像、resolution、origin、negate、しきい値 | なし | mobile_sim や mapper の地図を渡す |
 | `amcl_load_map` | path | なし | map_server の YAML を読む |
 | `amcl_get_pose` | なし | `Pose2DStamped`(map) | readonly |
 | `amcl_get_map` / `amcl_get_map_info` | なし | 画像 / dict | readonly。画面用 |
@@ -119,6 +119,7 @@ localization_amcl の HTTP ブローカー(8002)で `web/` を配信する。地
 1. **M0 雛形**: CMake、submodule、ライセンス、juiz_sdk 0.2.4 で空のプラグインを作る CI(Linux)。
 2. **M1 自己位置推定の本体**(`src/core`): 地図の読み込み(YAML + PNG/PGM、画像から)、フィルタの初期化・更新・推定姿勢・map -> odom。合成した部屋で、(a) 初期姿勢を与えた追従で誤差 0.1 m 以下、(b) 初期姿勢なしの大域的推定で収束、を ctest で確かめる。
 3. **M2 juiz コンポーネント**: コンテナとプロセス、`app.conf`、Transformations。結合テストは mobile_sim を動かして決まった経路を走らせ、推定姿勢と真値(mobile_sim の `get_pose`)の誤差を見る。オドメトリのノイズを大きめにして、オドメトリより良くなることを確かめる。
+   - 結果: 一周(約 110 秒)で誤差 0.02〜0.03 m・0.03 rad(オドメトリだけだと 0.5〜0.8 m)。粒子は数百個に収まる。既定の地図は左の部屋が上下対称に近く、`max_particles` 5000 の大域的な推定では向きを 180° 取り違えて収束することがあったので、conf の `max_particles` を 20000 にした(位置が決まると KLD で数百個に減る)。推定姿勢・共分散・map -> odom はリサンプリングのとき(`resample_interval` 回に 1 回)だけ更新し、その間はオドメトリの動きを足す(ROS と同じ)。
 4. **M3 ブラウザ画面**: 地図・粒子・姿勢の表示、初期姿勢の指定、大域的推定、地図の切り替え。Playwright で確かめる。
 5. **M4 juizapp 化と配布**: 5 ターゲットのビルド、`juiz pack`、`juiz run` での結合テスト、Releases への添付(GitHub の画面で Release を作る運用)。
 6. **M5 Docker**: mobile_sim と一緒に動かす compose.yml と、ghcr.io への公開。
