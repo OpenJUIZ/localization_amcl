@@ -1,0 +1,7 @@
+// localization_amcl が使う型。今は juiz の標準の型 (juiz_std) だけを使う。
+// C++ のヘッダは scripts/gen_types.sh で src/component/generated/ に書き出して、リポジトリに入れている
+// (ビルドする機械に juiz-idl を入れなくてよいように)
+namespace localization_amcl;
+
+import idl "juiz_std/sensor.jidl";
+import idl "juiz_std/geometry.jidl";

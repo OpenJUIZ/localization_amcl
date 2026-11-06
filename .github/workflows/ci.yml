@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JUIZ_VERSION: "0.2.4"
+
+jobs:
+  build:
+    # 配る Linux 向けのプラグインは古めの glibc でビルドする(juiz の app-package.md §12.2)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Fetch juiz_sdk
+        run: echo "JUIZ_SDK_DIR=$(scripts/fetch_juiz_sdk.sh "$JUIZ_VERSION")" >> "$GITHUB_ENV"
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$JUIZ_SDK_DIR"
+          cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Test with sanitizers
+        # amcl の C のコードのメモリの扱いを確かめる (時間のかかる大域的な推定は --quick で飛ばす)
+        run: |
+          cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DLOCALIZATION_AMCL_BUILD_COMPONENT=OFF \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
+          cmake --build build-asan --parallel
+          (cd build-asan/tests && ./core_test --quick)
+      - name: Install juiz
+        # C++ のプラグインは C ABI なので、pip の juiz でも読める(rustc を揃えなくてよい)
+        run: pip install "juiz-cli==$JUIZ_VERSION"
+      - name: Smoke test
+        run: |
+          scripts/dev_plugin.sh build
+          python3 scripts/smoke_test.py

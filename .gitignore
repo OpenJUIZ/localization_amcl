@@ -1,0 +1,11 @@
+/build*/
+/.juiz_sdk/
+*.juizapp
+/app/plugins/
+/dist/
+.DS_Store
+/app/.smoke_test.conf
+/core_test_map.*
+app/.*.conf
+/node_modules/
+/docker/maps/
