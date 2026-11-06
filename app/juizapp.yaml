@@ -1,0 +1,16 @@
+# .juizapp のマニフェスト(juiz docs/spec/app-package.md §4)。languages・targets・files は juiz pack が書き足す
+format: 1
+name: localization_amcl
+version: 0.1.0
+kind: app
+description: "AMCL localization: estimates the robot pose on a map from LiDAR scans and odometry (works with mobile_sim)"
+# localization_amcl 自体は MIT OR Apache-2.0。静的リンクした amcl は LGPL(LICENSE-amcl、ソースは https://github.com/OpenJUIZ/amcl)
+license: MIT OR Apache-2.0 AND LGPL-2.1-or-later
+homepage: https://github.com/OpenJUIZ/localization_amcl
+# C++ のプラグインは C ABI で、libjuiz_sdk を同梱する。確かめた juiz の版に合わせる(CMakeLists.txt の juiz_sdk と揃える)
+juiz: "=0.2.4"
+entry: app.conf
+# mobile_sim の odom・scan・lidar_mount トピックを使い、odom0 に System をまたぐ Transform を張る。
+# juiz run が ipc://mobile_sim を subsystem に足して版を確かめる
+depends:
+  mobile_sim: ">=0.3.1, <0.4"
