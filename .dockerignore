@@ -1,0 +1,10 @@
+# Docker のビルドに要らないもの(手元のビルド・パッケージ・SDK)
+.git
+build*
+dist
+.juiz_sdk
+app/plugins
+app/.*.conf
+node_modules
+*.juizapp
+core_test_map.*

@@ -1,0 +1,147 @@
+name: Release
+
+# ターゲットごとに C++ のプラグインをビルドし、.juizapp にまとめる。タグ v* では Releases に載せる。
+# C++ のプラグインは C ABI なので rustc を揃えなくてよいが、juiz_sdk の版は juiz と一致させる
+# (CMakeLists.txt の LOCALIZATION_AMCL_JUIZ_SDK_VERSION と app/juizapp.yaml の juiz)。
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # パッケージのテストで動かす mobile_sim(0.3 系)
+  MOBILE_SIM_REF: main
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    outputs:
+      juiz: ${{ steps.v.outputs.juiz }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          juiz=$(sed -n 's/^set(LOCALIZATION_AMCL_JUIZ_SDK_VERSION \([^ ]*\) .*/\1/p' CMakeLists.txt)
+          version=$(sed -n 's/^version: //p' app/juizapp.yaml)
+          cmake_version=$(sed -n 's/^project(localization_amcl VERSION \([^ ]*\) .*/\1/p' CMakeLists.txt)
+          echo "juiz $juiz, localization_amcl $version"
+          grep -qx "juiz: \"=$juiz\"" app/juizapp.yaml || { echo "app/juizapp.yaml の juiz を \"=$juiz\" にしてください"; exit 1; }
+          [ "$version" = "$cmake_version" ] || { echo "app/juizapp.yaml の version $version と CMakeLists.txt の $cmake_version が違います"; exit 1; }
+          echo "juiz=$juiz" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Check the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          [ "v${{ steps.v.outputs.version }}" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != app/juizapp.yaml version ${{ steps.v.outputs.version }}"; exit 1; }
+
+  plugin:
+    needs: versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux は古めの glibc でビルドする(新しい glibc にしか無い記号を使わないように)
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, test: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm, test: true }
+          - { target: x86_64-apple-darwin, os: macos-15, arch: x86_64, test: false }
+          - { target: aarch64-apple-darwin, os: macos-15, arch: arm64, test: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true }
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Fetch juiz_sdk
+        run: |
+          dir=$(scripts/fetch_juiz_sdk.sh "${{ needs.versions.outputs.juiz }}" "${{ matrix.target }}")
+          # Windows の CMake には C:/... の形で渡す
+          if command -v cygpath > /dev/null; then dir=$(cygpath -m "$dir"); fi
+          echo "JUIZ_SDK_DIR=$dir" >> "$GITHUB_ENV"
+      - name: Build
+        run: |
+          args=(-DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$JUIZ_SDK_DIR")
+          if [ -n "${{ matrix.arch }}" ]; then args+=(-DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"); fi
+          cmake -S . -B build "${args[@]}"
+          cmake --build build --config Release --parallel
+      - name: Test
+        # クロスビルド(Intel の macOS)は動かせないので飛ばす
+        if: matrix.test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Collect
+        run: |
+          out="plugins/${{ matrix.target }}"
+          mkdir -p "$out"
+          case "${{ matrix.target }}" in
+            *windows*) dir=build/src/component/Release; files="localization_amcl.dll juiz_sdk.dll" ;;
+            *apple*) dir=build/src/component; files="liblocalization_amcl.dylib libjuiz_sdk.dylib" ;;
+            *) dir=build/src/component; files="liblocalization_amcl.so libjuiz_sdk.so" ;;
+          esac
+          for f in $files; do cp "$dir/$f" "$out/"; done
+          ls -l "$out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ matrix.target }}
+          path: plugins
+
+  pack:
+    needs: [versions, plugin]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plugin-*
+          path: plugins
+          merge-multiple: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 配布先と同じく pip の juiz-cli を使う
+      - run: pip install "juiz-cli==${{ needs.versions.outputs.juiz }}"
+      - run: scripts/pack.sh plugins dist
+      - name: Build mobile_sim's package
+        # mobile_sim の .juizapp を手元で作る(Linux のプラグインだけ)。Releases に出るのを待たずに試せるように
+        run: |
+          git clone --depth 1 --branch "$MOBILE_SIM_REF" https://github.com/OpenJUIZ/mobile_sim.git ../mobile_sim
+          cd ../mobile_sim
+          scripts/dev_plugin.sh --release
+          scripts/pack.sh app/plugins ../mobile_sim_dist
+      - name: Test the package with juiz run
+        # 両方を juiz run で動かす。localization_amcl は juizapp.yaml の depends で mobile_sim の版を確かめる
+        run: |
+          python3 -u scripts/integration_test.py \
+            --mobile-sim-juizapp ../mobile_sim_dist/mobile_sim-*.juizapp --juizapp dist/*.juizapp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: juizapp
+          path: dist/*.juizapp
+      - name: Publish to Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # GitHub の画面で Release を作ってタグを打ったときは、その Release に .juizapp を足す
+        run: |
+          pkg=$(basename dist/*.juizapp)
+          notes="juiz ${{ needs.versions.outputs.juiz }} と mobile_sim 0.3 で動きます: \`pip install juiz-cli==${{ needs.versions.outputs.juiz }}\` の後、\`juiz run mobile_sim-0.3.x.juizapp\` を動かしたまま \`juiz run $pkg\`、http://localhost:8002/ を開く"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.juizapp --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.juizapp --title "$GITHUB_REF_NAME" --generate-notes --notes "$notes"
+          fi
