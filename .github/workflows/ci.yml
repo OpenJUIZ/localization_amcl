@@ -50,7 +50,20 @@ jobs:
         run: |
           git clone --depth 1 --branch "$MOBILE_SIM_REF" https://github.com/OpenJUIZ/mobile_sim.git ../mobile_sim
           (cd ../mobile_sim && scripts/dev_plugin.sh --release)
-      - name: Integration test with mobile_sim
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+      - name: Integration and UI test with mobile_sim
         # mobile_sim を部屋で走らせ、トピックで受けた odom・scan・lidar_mount から推定した姿勢を真の値と比べる。
-        # 初期姿勢の与え直し、地図の差し替え、大域的な推定も試す
-        run: python3 -u scripts/integration_test.py --mobile-sim ../mobile_sim
+        # 初期姿勢の与え直し、地図の差し替え、大域的な推定も試し、続けてブラウザ画面を Playwright で操作する
+        run: |
+          mkdir -p build/ui
+          python3 -u scripts/integration_test.py --mobile-sim ../mobile_sim --ui build/ui/ui_test.png
+      - name: Upload the screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshot
+          path: build/ui
+          if-no-files-found: ignore

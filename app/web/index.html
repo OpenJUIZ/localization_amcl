@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>localization_amcl</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>localization_amcl</h1>
+    <span id="connection" class="status">接続中…</span>
+    <span id="sim_connection" class="status"></span>
+  </header>
+  <main>
+    <section id="view">
+      <canvas id="map" width="640" height="640" aria-label="地図と推定した姿勢"></canvas>
+      <p class="hint" id="legend">
+        <span class="key est"></span>推定した姿勢
+        <span class="key cov"></span>誤差の楕円(2σ)
+        <span class="key particle"></span>粒子
+        <span class="key truth"></span>真の姿勢(mobile_sim)
+        <span class="key odom"></span>オドメトリだけ
+      </p>
+    </section>
+    <aside>
+      <h2>自己位置</h2>
+      <button id="set_pose" type="button">初期姿勢を指定</button>
+      <p class="hint">押してから地図の上で、位置を押して向きの方へドラッグする(RViz の 2D Pose Estimate と同じ)</p>
+      <button id="global" type="button">大域的な推定(粒子を地図全体に撒く)</button>
+      <h2>地図</h2>
+      <div class="row">
+        <button id="map_sim" type="button" hidden>mobile_sim の地図を使う</button>
+        <button id="map_mapper" type="button" hidden>mapper の地図を使う</button>
+      </div>
+      <label>ファイル <input id="map_path" type="text" value="assets/maps/default.yaml" size="20"></label>
+      <p class="hint">ROS map_server の YAML。localization_amcl のカレントディレクトリ(juiz run なら展開先)からの相対パス</p>
+      <button id="map_load" type="button">ファイルを読む</button>
+      <p id="message" class="hint" role="status"></p>
+      <label><input id="show_particles" type="checkbox" checked> 粒子を描く</label>
+      <label><input id="show_scan" type="checkbox" checked> スキャンを推定位置から描く</label>
+      <label><input id="show_truth" type="checkbox" checked> 真の姿勢を描く</label>
+      <label><input id="show_odom" type="checkbox" checked> オドメトリを描く</label>
+      <section id="drive" hidden>
+        <h2>操作(mobile_sim)</h2>
+        <canvas id="pad" width="160" height="160" aria-label="速度パッド"></canvas>
+        <p class="hint">WASD / 矢印キー、またはパッドをドラッグ</p>
+        <label>最大速度 <input id="max_v" type="number" step="0.1" min="0.1" value="0.5"> m/s</label>
+        <label>最大角速度 <input id="max_w" type="number" step="0.1" min="0.1" value="1.0"> rad/s</label>
+      </section>
+      <h2>状態</h2>
+      <dl id="state">
+        <dt>推定位置</dt><dd id="s_pose">-</dd>
+        <dt>標準偏差</dt><dd id="s_sigma">-</dd>
+        <dt>座標系</dt><dd id="s_frame">-</dd>
+        <dt>LiDAR の取付位置</dt><dd id="s_mount">-</dd>
+        <dt>真の位置</dt><dd id="s_truth">-</dd>
+        <dt>誤差</dt><dd id="s_err">-</dd>
+        <dt>オドメトリの誤差</dt><dd id="s_odom_err">-</dd>
+        <dt>粒子</dt><dd id="s_particles">-</dd>
+        <dt>更新</dt><dd id="s_updates">-</dd>
+        <dt>スキャン</dt><dd id="s_scans">-</dd>
+        <dt>地図</dt><dd id="s_map">-</dd>
+        <dt>エラー</dt><dd id="s_error">-</dd>
+      </dl>
+    </aside>
+  </main>
+  <script src="localization_amcl.js"></script>
+</body>
+</html>
