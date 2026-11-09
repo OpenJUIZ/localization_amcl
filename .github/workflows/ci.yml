@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  JUIZ_VERSION: "0.2.4"
+  JUIZ_VERSION: "0.2.5"
   # 結合テストで動かす mobile_sim(odom・scan・lidar_mount を出す 0.3 系)
   MOBILE_SIM_REF: main
 

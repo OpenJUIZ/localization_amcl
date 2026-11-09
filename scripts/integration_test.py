@@ -7,7 +7,7 @@ mobile_sim をトピック cmd_vel で部屋の中を一周させ、localization
   scripts/dev_plugin.sh build
   python3 scripts/integration_test.py --mobile-sim <mobile_sim のリポジトリ> [--juiz <juiz のパス>]
     mobile_sim は app/plugins/<target>/ にプラグインを置いておく(mobile_sim の scripts/dev_plugin.sh)
-  python3 scripts/integration_test.py --mobile-sim-juizapp mobile_sim-0.3.3.juizapp [--juizapp dist/localization_amcl-0.1.0.juizapp]
+  python3 scripts/integration_test.py --mobile-sim-juizapp mobile_sim-0.3.3.juizapp [--juizapp dist/localization_amcl-0.1.1.juizapp]
     パッケージで動かす(ポートは mobile_sim 8000、localization_amcl 8002)
   python3 scripts/integration_test.py --sim-url http://localhost:8000 --amcl-url http://localhost:8002
     もう動いている mobile_sim と localization_amcl を試す(docker compose など)

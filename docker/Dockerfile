@@ -6,7 +6,7 @@
 # C++ のプラグインは C ABI なので、juiz は pip の juiz-cli をそのまま使う。
 # mobile_sim のイメージは juiz run ではなく juiz -f で動くので、こちらも conf の HTTP の subsystem でつなぐ。
 # juiz_sdk の版は juiz と揃える(CMakeLists.txt の LOCALIZATION_AMCL_JUIZ_SDK_VERSION と app/juizapp.yaml の juiz)。
-ARG JUIZ_VERSION=0.2.4
+ARG JUIZ_VERSION=0.2.5
 
 # プラグインをビルドしてテストする
 FROM debian:bookworm AS build
