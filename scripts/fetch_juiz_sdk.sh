@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # juiz の Releases から juiz_sdk のアーカイブを取ってきて展開し、そのディレクトリを出力する。
-# 使い方: scripts/fetch_juiz_sdk.sh [版 (既定 0.2.5)] [ターゲット (既定はこの機械)] [置き場所 (既定 .juiz_sdk)]
+# 使い方: scripts/fetch_juiz_sdk.sh [版 (既定 0.2.7)] [ターゲット (既定はこの機械)] [置き場所 (既定 .juiz_sdk)]
 #   cmake -B build -DCMAKE_PREFIX_PATH="$(scripts/fetch_juiz_sdk.sh)"
 set -euo pipefail
 
-version="${1:-0.2.5}"
+version="${1:-0.2.7}"
 target="${2:-}"
 dest="${3:-.juiz_sdk}"
 

@@ -9,7 +9,7 @@
 [Releases](https://github.com/OpenJUIZ/localization_amcl/releases) から `localization_amcl-<version>.juizapp` を、[mobile_sim の Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から 0.3 系の `mobile_sim-<version>.juizapp` を取ってきます。
 
 ```sh
-pip install juiz-cli==0.2.5
+pip install juiz-cli==0.2.7
 juiz run mobile_sim-<version>.juizapp          # 先に動かしておく(ipc://mobile_sim、http://localhost:8000/)
 juiz run localization_amcl-<version>.juizapp   # 別の端末で。ブラウザで http://localhost:8002/ を開く
 ```
@@ -56,15 +56,15 @@ CMake 3.16 以降と C/C++17 のコンパイラが要ります。
 ```sh
 git clone --recursive https://github.com/OpenJUIZ/localization_amcl
 cd localization_amcl
-sdk="$(scripts/fetch_juiz_sdk.sh 0.2.5)"   # juiz の Releases から juiz_sdk を取って .juiz_sdk/ に展開する
+sdk="$(scripts/fetch_juiz_sdk.sh 0.2.7)"   # juiz の Releases から juiz_sdk を取って .juiz_sdk/ に展開する
 cmake -B build -DCMAKE_PREFIX_PATH="$sdk"
 cmake --build build
 ctest --test-dir build
 ```
 
-- juiz_sdk の版は、使う juiz の版と完全に一致させます(既定は 0.2.5)。
+- juiz_sdk の版は、使う juiz の版と完全に一致させます(既定は 0.2.7)。
 - juiz_sdk が無くても `-DLOCALIZATION_AMCL_BUILD_COMPONENT=OFF` で `src/core` とテストだけをビルドできます。
-- `scripts/dev_plugin.sh` はプラグインをビルドして `app/plugins/<target>/` に置きます。`python3 scripts/smoke_test.py` で juiz から読み込めるかを確かめます(`pip install juiz-cli==0.2.5`)。
+- `scripts/dev_plugin.sh` はプラグインをビルドして `app/plugins/<target>/` に置きます。`python3 scripts/smoke_test.py` で juiz から読み込めるかを確かめます(`pip install juiz-cli==0.2.7`)。
 - `python3 scripts/integration_test.py --mobile-sim <mobile_sim のリポジトリ>` で mobile_sim と一緒に動かして推定の精度を確かめます(`--ui <png>` でブラウザ画面のテストも。Playwright が要る)。
 - `scripts/pack.sh` で `dist/localization_amcl-<version>.juizapp` を作ります。リリースは GitHub の画面で `v<version>` の Release を作ると、`release.yml` が 5 ターゲットの `.juizapp` を添付します。
 
