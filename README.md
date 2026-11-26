@@ -9,7 +9,7 @@
 [Releases](https://github.com/OpenJUIZ/localization_amcl/releases) から `localization_amcl-<version>.juizapp` を、[mobile_sim の Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から 0.3 系の `mobile_sim-<version>.juizapp` を取ってきます。
 
 ```sh
-pip install juiz-cli==0.3.2
+pip install juiz-cli==0.3.7
 juiz run mobile_sim-<version>.juizapp          # 先に動かしておく(ipc://mobile_sim、http://localhost:8000/)
 juiz run localization_amcl-<version>.juizapp   # 別の端末で。ブラウザで http://localhost:8002/ を開く
 ```
@@ -21,6 +21,20 @@ juiz run localization_amcl-<version>.juizapp   # 別の端末で。ブラウザ�
 - パラメータは ROS の amcl と同じ名前です(`app.conf` の `amcl0` の項目)。
 
 対応するターゲット: Linux(x86_64、aarch64)、macOS(Apple シリコン、Intel)、Windows(x86_64)。
+
+### 別の機械の mobile_sim につなぐ
+
+localization_amcl は mobile_sim を名前の登録で探します(juiz 0.3.7 のネーミングサービス)。同じ機械に mobile_sim が動いていなければ、LAN で `--advertise` 付きで起動した mobile_sim を見つけてつなぎます。pip の `juiz-cli` にはこの機能が入っています([ネーミングサービス](https://openjuiz.github.io/ja/guides/naming/#lan-の自動発見mdns))。
+
+```sh
+juiz run mobile_sim-<version>.juizapp --advertise      # mobile_sim の機械で
+juiz run localization_amcl-<version>.juizapp      # localization_amcl の機械で
+# using mobile_sim at http://192.168.0.10:8000 (found in the name list)
+```
+
+- マルチキャストが届かない網(Docker の bridge、一部の Wi-Fi、サブネット越え)では見つかりません。そのときは `--depend mobile_sim=http://192.168.0.10:8000` でつなぎ先を書くか、`--peer http://192.168.0.10:8000` で問い合わせ先を教えます。
+- mobile_sim は、localization_amcl がつないできたアドレスの 8002 番にトピックを送ります。mobile_sim の機械からその番号に届くようにしてください。
+- mobile_sim がどこにも見つからないと `mobile_sim is not registered on this machine or the LAN.` で止まります。先に mobile_sim を起動してください。juiz 0.3.6 以前で動かした mobile_sim は登録されないので、そのときは `--depend mobile_sim=ipc://mobile_sim` で指定します。
 
 ### Docker
 
@@ -56,15 +70,15 @@ CMake 3.16 以降と C/C++17 のコンパイラが要ります。
 ```sh
 git clone --recursive https://github.com/OpenJUIZ/localization_amcl
 cd localization_amcl
-sdk="$(scripts/fetch_juiz_sdk.sh 0.3.2)"   # juiz の Releases から juiz_sdk を取って .juiz_sdk/ に展開する
+sdk="$(scripts/fetch_juiz_sdk.sh 0.3.7)"   # juiz の Releases から juiz_sdk を取って .juiz_sdk/ に展開する
 cmake -B build -DCMAKE_PREFIX_PATH="$sdk"
 cmake --build build
 ctest --test-dir build
 ```
 
-- juiz_sdk の版は、使う juiz の版と完全に一致させます((既定は 0.3.2))。
+- juiz_sdk の版は、使う juiz の版と完全に一致させます(既定は 0.3.7)。
 - juiz_sdk が無くても `-DLOCALIZATION_AMCL_BUILD_COMPONENT=OFF` で `src/core` とテストだけをビルドできます。
-- `scripts/dev_plugin.sh` はプラグインをビルドして `app/plugins/<target>/` に置きます。`python3 scripts/smoke_test.py` で juiz から読み込めるかを確かめます(`pip install juiz-cli==0.3.2`)。
+- `scripts/dev_plugin.sh` はプラグインをビルドして `app/plugins/<target>/` に置きます。`python3 scripts/smoke_test.py` で juiz から読み込めるかを確かめます(`pip install juiz-cli==0.3.7`)。
 - `python3 scripts/integration_test.py --mobile-sim <mobile_sim のリポジトリ>` で mobile_sim と一緒に動かして推定の精度を確かめます(`--ui <png>` でブラウザ画面のテストも。Playwright が要る)。
 - `scripts/pack.sh` で `dist/localization_amcl-<version>.juizapp` を作ります。リリースは GitHub の画面で `v<version>` の Release を作ると、`release.yml` が 5 ターゲットの `.juizapp` を添付します。
 
